@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人药品管理系统 (纯JS版)</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1, h2 { color: #0056b3; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .form-section, .table-section { padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        form { display: flex; flex-direction: column; gap: 10px; }
+        input[type="text"], input[type="number"], select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        .btn-danger { background-color: #dc3545; }
+        .btn-danger:hover { background-color: #c82333; }
+        .btn-secondary { background-color: #6c757d; }
+        .btn-secondary:hover { background-color: #5a6268; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .search-bar { margin-bottom: 20px; padding: 8px; width: 50%; }
+        .data-management { margin-top: 20px; display: flex; gap: 10px; }
+        .warning-stock { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>个人药品管理系统</h1>
+    
+    <div class="grid-container">
+        <!-- 操作区 -->
+        <div class="form-section">
+            <h2>新增药品</h2>
+            <form id="addDrugForm">
+                <input type="text" id="drugName" placeholder="药品名称 (如: 布洛芬缓释胶囊)" required>
+                <input type="text" id="drugSpec" placeholder="规格 (如: 0.3g*24粒)" required>
+                <input type="text" id="drugManu" placeholder="生产厂家 (如: 芬必得)">
+                <input type="number" id="drugPrice" placeholder="默认参考单价" step="0.01">
+                <button type="submit">添加药品</button>
+            </form>
+
+            <h2 style="margin-top: 30px;">出入库操作</h2>
+            <form id="stockOpForm">
+                <select id="opDrugSelect" required></select>
+                <div>
+                    <label><input type="radio" name="opType" value="IN" checked> 入库</label>
+                    <label><input type="radio" name="opType" value="OUT"> 出库</label>
+                </div>
+                <input type="number" id="opQuantity" placeholder="数量" required min="1">
+                <input type="number" id="opPrice" placeholder="本次入库单价 (出库时可不填)" step="0.01">
+                <button type="submit">执行操作</button>
+            </form>
+        </div>
+
+        <!-- 库存总览区 -->
+        <div class="table-section">
+            <h2>库存总览</h2>
+            <input type="text" id="searchInput" class="search-bar" placeholder="搜索药品名称...">
+            <table>
+                <thead>
+                    <tr>
+                        <th>名称</th>
+                        <th>规格</th>
+                        <th>厂家</th>
+                        <th>当前库存</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="drugTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 流水记录区 -->
+    <div class="table-section" style="margin-top: 30px;">
+        <h2>出入库流水</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>药品名称</th>
+                    <th>操作类型</th>
+                    <th>数量</th>
+                    <th>单价</th>
+                </tr>
+            </thead>
+            <tbody id="recordsTableBody"></tbody>
+        </table>
+    </div>
+
+    <!-- 数据管理 -->
+    <div class="data-management">
+        <button id="exportDataBtn" class="btn-secondary">导出数据为 JSON</button>
+        <input type="file" id="importDataInput" accept=".json" style="display: none;">
+        <button id="importDataBtn" class="btn-secondary">导入数据</button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- 数据层 ---
+    const DB_KEY = 'myDrugSystemData';
+    let state = {
+        drugs: [],
+        stockRecords: []
+    };
+
+    function loadData() {
+        const data = localStorage.getItem(DB_KEY);
+        if (data) {
+            try {
+                const parsedData = JSON.parse(data);
+                if (parsedData.drugs && parsedData.stockRecords) {
+                    state = parsedData;
+                }
+            } catch (e) {
+                console.error("Error parsing data from localStorage", e);
+            }
+        }
+    }
+
+    function saveData() {
+        localStorage.setItem(DB_KEY, JSON.stringify(state));
+    }
+
+    // --- 业务逻辑层 ---
+    function addDrug(name, spec, manufacturer, defaultPrice) {
+        const newDrug = {
+            id: 'drug_' + Date.now(),
+            name, spec, manufacturer,
+            defaultPrice: parseFloat(defaultPrice) || 0
+        };
+        state.drugs.push(newDrug);
+        saveData();
+    }
+
+    function deleteDrug(drugId) {
+        if (confirm('确定要删除这个药品吗？相关的流水记录不会被删除，但无法再进行操作。')) {
+            state.drugs = state.drugs.filter(d => d.id !== drugId);
+            saveData();
+            renderAll();
+        }
+    }
+    // Make deleteDrug globally accessible for the button's onclick
+    window.deleteDrug = deleteDrug;
+
+    function performStockOperation(drugId, type, quantity, price) {
+        if (!drugId || !type || quantity <= 0) {
+            alert('输入信息不完整！');
+            return false;
+        }
+        if (type === 'OUT') {
+            const currentStock = calculateStock(drugId);
+            if (currentStock < quantity) {
+                alert(`库存不足！当前库存: ${currentStock}，出库数量: ${quantity}`);
+                return false;
+            }
+        }
+        const newRecord = {
+            recordId: 'rec_' + Date.now(),
+            drugId,
+            type,
+            quantity: parseInt(quantity),
+            price: parseFloat(price) || 0,
+            timestamp: new Date().toLocaleString('zh-CN')
+        };
+        state.stockRecords.push(newRecord);
+        saveData();
+        return true;
+    }
+
+    function calculateStock(drugId) {
+        return state.stockRecords.reduce((stock, record) => {
+            if (record.drugId === drugId) {
+                return stock + (record.type === 'IN' ? record.quantity : -record.quantity);
+            }
+            return stock;
+        }, 0);
+    }
+    
+    function getDrugById(drugId) {
+        return state.drugs.find(d => d.id === drugId);
+    }
+
+    // --- 视图渲染层 ---
+    function renderDrugTable(filter = '') {
+        const tableBody = document.getElementById('drugTableBody');
+        tableBody.innerHTML = '';
+        const lowerCaseFilter = filter.toLowerCase();
+
+        const filteredDrugs = state.drugs.filter(drug => 
+            drug.name.toLowerCase().includes(lowerCaseFilter) ||
+            drug.spec.toLowerCase().includes(lowerCaseFilter) ||
+            (drug.manufacturer && drug.manufacturer.toLowerCase().includes(lowerCaseFilter))
+        );
+        
+        filteredDrugs.forEach(drug => {
+            const stock = calculateStock(drug.id);
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${drug.name}</td>
+                <td>${drug.spec}</td>
+                <td>${drug.manufacturer}</td>
+                <td class="${stock <= 10 ? 'warning-stock' : ''}">${stock}</td>
+                <td><button class="btn-danger" onclick="deleteDrug('${drug.id}')">删除</button></td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+
+    function updateDrugSelector() {
+        const select = document.getElementById('opDrugSelect');
+        select.innerHTML = '<option value="">--请选择药品--</option>';
+        state.drugs.forEach(drug => {
+            select.innerHTML += `<option value="${drug.id}">${drug.name} (${drug.spec})</option>`;
+        });
+    }
+
+    function renderRecordsTable() {
+        const tableBody = document.getElementById('recordsTableBody');
+        tableBody.innerHTML = '';
+        // Display latest records first
+        [...state.stockRecords].reverse().forEach(record => {
+            const drug = getDrugById(record.drugId);
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${record.timestamp}</td>
+                <td>${drug ? drug.name : '（已删除药品）'}</td>
+                <td>${record.type === 'IN' ? '入库' : '出库'}</td>
+                <td>${record.quantity}</td>
+                <td>${record.price > 0 ? record.price.toFixed(2) : '-'}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+
+    function renderAll(filter = '') {
+        updateDrugSelector();
+        renderDrugTable(filter);
+        renderRecordsTable();
+    }
+
+    // --- 事件监听 ---
+    document.getElementById('addDrugForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = document.getElementById('drugName').value.trim();
+        const spec = document.getElementById('drugSpec').value.trim();
+        const manu = document.getElementById('drugManu').value.trim();
+        const price = document.getElementById('drugPrice').value;
+        addDrug(name, spec, manu, price);
+        e.target.reset();
+        renderAll();
+    });
+
+    document.getElementById('stockOpForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const drugId = document.getElementById('opDrugSelect').value;
+        const type = document.querySelector('input[name="opType"]:checked').value;
+        const quantity = document.getElementById('opQuantity').value;
+        const price = document.getElementById('opPrice').value;
+        
+        if (performStockOperation(drugId, type, parseInt(quantity), parseFloat(price))) {
+            e.target.reset();
+            // restore radio button default
+            document.querySelector('input[name="opType"][value="IN"]').checked = true;
+            renderAll();
+        }
+    });
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+        renderDrugTable(e.target.value);
+    });
+
+    // Data Management Events
+    document.getElementById('exportDataBtn').addEventListener('click', () => {
+        if(state.drugs.length === 0 && state.stockRecords.length === 0) {
+            alert("没有数据可以导出。");
+            return;
+        }
+        const dataStr = JSON.stringify(state, null, 2);
+        const blob = new Blob([dataStr], {type: "application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `drug_system_backup_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+    
+    document.getElementById('importDataBtn').addEventListener('click', () => {
+        document.getElementById('importDataInput').click();
+    });
+
+    document.getElementById('importDataInput').addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedState = JSON.parse(e.target.result);
+                if (typeof importedState.drugs === 'object' && typeof importedState.stockRecords === 'object') {
+                    if (confirm('这将覆盖所有现有数据，确定要导入吗？')) {
+                        state = importedState;
+                        saveData();
+                        renderAll();
+                        alert('数据导入成功！');
+                    }
+                } else {
+                    alert('文件格式不正确！');
+                }
+            } catch (error) {
+                alert('导入失败，文件内容不是有效的JSON格式！');
+            }
+        };
+        reader.readAsText(file);
+        // Reset file input to allow importing the same file again
+        event.target.value = '';
+    });
+
+    // --- 初始化 ---
+    loadData();
+    renderAll();
+});
+</script>
+
+</body>
+</html>
