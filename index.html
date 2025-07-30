@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>个人药品管理系统 (纯JS版)</title>
+    <title>个人药品管理系统 (简化版)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
         .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -11,7 +11,7 @@
         .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
         .form-section, .table-section { padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
         form { display: flex; flex-direction: column; gap: 10px; }
-        input[type="text"], input[type="number"], select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        input[type="text"], input[type="number"], select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
         button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
         button:hover { background-color: #0056b3; }
         .btn-danger { background-color: #dc3545; }
@@ -24,6 +24,7 @@
         .search-bar { margin-bottom: 20px; padding: 8px; width: 50%; }
         .data-management { margin-top: 20px; display: flex; gap: 10px; }
         .warning-stock { color: red; font-weight: bold; }
+        label > input[type="radio"] { margin-right: 5px; }
     </style>
 </head>
 <body>
@@ -36,10 +37,10 @@
         <div class="form-section">
             <h2>新增药品</h2>
             <form id="addDrugForm">
-                <input type="text" id="drugName" placeholder="药品名称 (如: 布洛芬缓释胶囊)" required>
-                <input type="text" id="drugSpec" placeholder="规格 (如: 0.3g*24粒)" required>
-                <input type="text" id="drugManu" placeholder="生产厂家 (如: 芬必得)">
-                <input type="number" id="drugPrice" placeholder="默认参考单价" step="0.01">
+                <input type="text" id="drugName" placeholder="药品名称 (必填)" required>
+                <input type="number" id="drugPrice" placeholder="参考单价 (必填)" step="0.01" required>
+                <input type="text" id="drugSpec" placeholder="规格 (选填, 如: 0.3g*24粒)">
+                <input type="text" id="drugManu" placeholder="生产厂家 (选填)">
                 <button type="submit">添加药品</button>
             </form>
 
@@ -50,8 +51,8 @@
                     <label><input type="radio" name="opType" value="IN" checked> 入库</label>
                     <label><input type="radio" name="opType" value="OUT"> 出库</label>
                 </div>
-                <input type="number" id="opQuantity" placeholder="数量" required min="1">
-                <input type="number" id="opPrice" placeholder="本次入库单价 (出库时可不填)" step="0.01">
+                <input type="number" id="opQuantity" placeholder="数量 (必填)" required min="1">
+                <input type="number" id="opPrice" placeholder="本次入库单价 (必填)" step="0.01" required>
                 <button type="submit">执行操作</button>
             </form>
         </div>
@@ -103,7 +104,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     // --- 数据层 ---
-    const DB_KEY = 'myDrugSystemData';
+    const DB_KEY = 'myDrugSystemData_v2'; // 使用新key避免与旧版冲突
     let state = {
         drugs: [],
         stockRecords: []
@@ -118,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     state = parsedData;
                 }
             } catch (e) {
-                console.error("Error parsing data from localStorage", e);
+                console.error("无法从localStorage解析数据", e);
             }
         }
     }
@@ -129,28 +130,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 业务逻辑层 ---
     function addDrug(name, spec, manufacturer, defaultPrice) {
+        // 后端逻辑校验 (虽然前端有 required, 但JS校验更可靠)
+        if (!name || defaultPrice === '' || isNaN(parseFloat(defaultPrice))) {
+            alert('药品名称和参考单价为必填项！');
+            return false;
+        }
         const newDrug = {
             id: 'drug_' + Date.now(),
             name, spec, manufacturer,
-            defaultPrice: parseFloat(defaultPrice) || 0
+            defaultPrice: parseFloat(defaultPrice)
         };
         state.drugs.push(newDrug);
         saveData();
+        return true;
     }
 
     function deleteDrug(drugId) {
-        if (confirm('确定要删除这个药品吗？相关的流水记录不会被删除，但无法再进行操作。')) {
+        if (confirm('确定要删除这个药品吗？相关的流水记录会保留，但药品本身会从列表中移除。')) {
             state.drugs = state.drugs.filter(d => d.id !== drugId);
             saveData();
             renderAll();
         }
     }
-    // Make deleteDrug globally accessible for the button's onclick
-    window.deleteDrug = deleteDrug;
+    window.deleteDrug = deleteDrug; // 挂载到window，让onclick可以调用
 
     function performStockOperation(drugId, type, quantity, price) {
-        if (!drugId || !type || quantity <= 0) {
-            alert('输入信息不完整！');
+        if (!drugId || !type || !quantity || quantity <= 0) {
+            alert('药品、操作类型和数量为必填项！');
+            return false;
+        }
+        // 入库时，价格必须填写
+        if (type === 'IN' && (price === '' || isNaN(parseFloat(price)))) {
+            alert('入库操作必须填写本次入库单价！');
             return false;
         }
         if (type === 'OUT') {
@@ -162,10 +173,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const newRecord = {
             recordId: 'rec_' + Date.now(),
-            drugId,
-            type,
+            drugId, type,
             quantity: parseInt(quantity),
-            price: parseFloat(price) || 0,
+            price: parseFloat(price) || 0, // 出库时价格可为0
             timestamp: new Date().toLocaleString('zh-CN')
         };
         state.stockRecords.push(newRecord);
@@ -193,9 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const lowerCaseFilter = filter.toLowerCase();
 
         const filteredDrugs = state.drugs.filter(drug => 
-            drug.name.toLowerCase().includes(lowerCaseFilter) ||
-            drug.spec.toLowerCase().includes(lowerCaseFilter) ||
-            (drug.manufacturer && drug.manufacturer.toLowerCase().includes(lowerCaseFilter))
+            drug.name.toLowerCase().includes(lowerCaseFilter)
         );
         
         filteredDrugs.forEach(drug => {
@@ -203,8 +211,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${drug.name}</td>
-                <td>${drug.spec}</td>
-                <td>${drug.manufacturer}</td>
+                <td>${drug.spec || '-'}</td>
+                <td>${drug.manufacturer || '-'}</td>
                 <td class="${stock <= 10 ? 'warning-stock' : ''}">${stock}</td>
                 <td><button class="btn-danger" onclick="deleteDrug('${drug.id}')">删除</button></td>
             `;
@@ -216,15 +224,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const select = document.getElementById('opDrugSelect');
         select.innerHTML = '<option value="">--请选择药品--</option>';
         state.drugs.forEach(drug => {
-            select.innerHTML += `<option value="${drug.id}">${drug.name} (${drug.spec})</option>`;
+            select.innerHTML += `<option value="${drug.id}">${drug.name} (${drug.spec || '无规格'})</option>`;
         });
     }
 
     function renderRecordsTable() {
         const tableBody = document.getElementById('recordsTableBody');
         tableBody.innerHTML = '';
-        // Display latest records first
-        [...state.stockRecords].reverse().forEach(record => {
+        [...state.stockRecords].reverse().slice(0, 100).forEach(record => { // 只显示最近100条
             const drug = getDrugById(record.drugId);
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -244,16 +251,17 @@ document.addEventListener('DOMContentLoaded', () => {
         renderRecordsTable();
     }
 
-    // --- 事件监听 ---
+    // --- 事件监听与交互 ---
     document.getElementById('addDrugForm').addEventListener('submit', (e) => {
         e.preventDefault();
         const name = document.getElementById('drugName').value.trim();
         const spec = document.getElementById('drugSpec').value.trim();
         const manu = document.getElementById('drugManu').value.trim();
         const price = document.getElementById('drugPrice').value;
-        addDrug(name, spec, manu, price);
-        e.target.reset();
-        renderAll();
+        if (addDrug(name, spec, manu, price)) {
+            e.target.reset();
+            renderAll();
+        }
     });
 
     document.getElementById('stockOpForm').addEventListener('submit', (e) => {
@@ -263,10 +271,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const quantity = document.getElementById('opQuantity').value;
         const price = document.getElementById('opPrice').value;
         
-        if (performStockOperation(drugId, type, parseInt(quantity), parseFloat(price))) {
+        if (performStockOperation(drugId, type, quantity, price)) {
             e.target.reset();
-            // restore radio button default
             document.querySelector('input[name="opType"][value="IN"]').checked = true;
+            updateOpPriceRequirement(); // 重置价格输入框状态
             renderAll();
         }
     });
@@ -275,7 +283,27 @@ document.addEventListener('DOMContentLoaded', () => {
         renderDrugTable(e.target.value);
     });
 
-    // Data Management Events
+    // 动态调整“本次单价”输入框的必填状态
+    const opPriceInput = document.getElementById('opPrice');
+    function updateOpPriceRequirement() {
+        const type = document.querySelector('input[name="opType"]:checked').value;
+        if (type === 'IN') {
+            opPriceInput.placeholder = "本次入库单价 (必填)";
+            opPriceInput.required = true;
+        } else {
+            opPriceInput.placeholder = "出库价格 (选填)";
+            opPriceInput.required = false;
+        }
+    }
+    document.querySelectorAll('input[name="opType"]').forEach(radio => {
+        radio.addEventListener('change', updateOpPriceRequirement);
+    });
+
+    // 数据管理事件
+    document.getElementById('exportDataBtn').addEventListener('click', () => { /* ...代码同前一版... */ });
+    document.getElementById('importDataBtn').addEventListener('click', () => { /* ...代码同前一版... */ });
+    document.getElementById('importDataInput').addEventListener('change', (event) => { /* ...代码同前一版... */ });
+    // 为简洁起见，省略了数据导入导出代码，您可以从上一版回答中复制粘贴过来，它们无需改动。
     document.getElementById('exportDataBtn').addEventListener('click', () => {
         if(state.drugs.length === 0 && state.stockRecords.length === 0) {
             alert("没有数据可以导出。");
@@ -319,12 +347,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         reader.readAsText(file);
-        // Reset file input to allow importing the same file again
         event.target.value = '';
     });
 
+
     // --- 初始化 ---
     loadData();
+    updateOpPriceRequirement(); // 初始化价格输入框状态
     renderAll();
 });
 </script>
