@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SHA-256 Hash Generator</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; flex-direction: column; }
+        input { width: 300px; padding: 10px; margin-bottom: 10px; }
+        pre { background-color: #eee; padding: 15px; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <h2>输入你的密码</h2>
+    <input type="text" id="password" placeholder="Enter your secret password here">
+    <h2>生成的 SHA-256 哈希值 (复制这个)</h2>
+    <pre id="hash-output">请在上面输入密码...</pre>
+<script>
+    const passwordInput = document.getElementById('password');
+    const hashOutput = document.getElementById('hash-output');
+
+    async function generateHash(text) {
+        if (!text) {
+            hashOutput.textContent = '请在上面输入密码...';
+            return;
+        }
+        const encoder = new TextEncoder();
+        const data = encoder.encode(text);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        hashOutput.textContent = hashHex;
+    }
+
+    passwordInput.addEventListener('input', (e) => generateHash(e.target.value));
+</script>
+</body>
+</html>
