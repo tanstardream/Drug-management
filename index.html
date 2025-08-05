@@ -3,13 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>个人药品管理系统 (安全版)</title>
+    <title>个人药品管理系统</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
-        #password-gate { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 9999; }
-        #password-box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); text-align: center; }
-        #password-input { padding: 10px; font-size: 16px; width: 200px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; }
-        #app-container { display: none; max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        #app-container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1, h2 { color: #0056b3; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
         .form-section, .table-section { padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
@@ -31,18 +28,6 @@
     </style>
 </head>
 <body>
-
-<div id="password-gate">
-    <div id="password-box">
-        <h2>请输入密码</h2>
-        <form id="password-form">
-            <input type="password" id="password-input" autocomplete="off" autofocus>
-            <br>
-            <button type="submit">进入系统</button>
-        </form>
-    </div>
-</div>
-
 <div id="app-container">
     <!-- 主应用HTML结构... (此处省略，与之前版本相同) -->
     <h1>个人药品管理系统</h1>
@@ -93,44 +78,6 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-
-    // ===================================================================
-    // 重要：将下面引号内的值替换为你生成的密码哈希值
-    const CORRECT_PASSWORD_HASH = '615ed7fb1504b0c724a296d7a69e6c7b2f9ea2c57c1d8206c5afdf392ebdfd25'; // <--- 这是'123456'的哈希值，请替换成你自己的！
-    // ===================================================================
-
-    const passwordGate = document.getElementById('password-gate');
-    const passwordForm = document.getElementById('password-form');
-    const passwordInput = document.getElementById('password-input');
-    const appContainer = document.getElementById('app-container');
-
-    // 哈希函数，将输入的文本转换为SHA-256哈希值
-    async function sha256(text) {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(text);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
-    passwordForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const userInput = passwordInput.value;
-        const userInputHash = await sha256(userInput);
-
-        if (userInputHash === CORRECT_PASSWORD_HASH) {
-            passwordGate.style.display = 'none';
-            appContainer.style.display = 'block';
-            initializeApp();
-        } else {
-            alert('密码错误！');
-            passwordInput.value = '';
-            passwordInput.focus();
-        }
-    });
-
-    function initializeApp() {
-        // --- 以下所有代码与之前版本完全相同，无需改动 ---
         const DB_KEY = 'myDrugSystemData_v2';
         let state = { drugs: [], stockRecords: [] };
         function loadData() {
@@ -239,7 +186,6 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.readAsText(file); event.target.value = '';
         });
         loadData(); updateOpPriceRequirement(); renderAll();
-    }
 });
 </script>
 
