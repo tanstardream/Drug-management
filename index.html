@@ -4,63 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>个人药品管理系统</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
-        #app-container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1, h2 { color: #0056b3; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
-        .form-section, .table-section { padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
-        form { display: flex; flex-direction: column; gap: 10px; }
-        input[type="text"], input[type="number"], select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
-        button:hover { background-color: #0056b3; }
-        .btn-danger { background-color: #dc3545; }
-        .btn-danger:hover { background-color: #c82333; }
-        .btn-secondary { background-color: #6c757d; }
-        .btn-secondary:hover { background-color: #5a6268; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .search-bar { margin-bottom: 20px; padding: 8px; width: 50%; }
-        .data-management { margin-top: 20px; display: flex; gap: 10px; }
-        .warning-stock { color: red; font-weight: bold; }
-        label > input[type="radio"] { margin-right: 5px; }
-        .stats-section { 
-            background: #f8f9fa; 
-            padding: 15px; 
-            border-radius: 5px; 
-            margin-top: 20px; 
-            border: 1px solid #dee2e6;
-        }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 10px;
-        }
-        .stat-item {
-            background: white;
-            padding: 15px;
-            border-radius: 4px;
-            text-align: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #0056b3;
-        }
-        .stat-label {
-            font-size: 14px;
-            color: #666;
-            margin-top: 5px;
-        }
-    </style>
+    <link rel="stylesheet" href="assets/css/main.css">
 </head>
 <body>
 <div id="app-container">
-    <!-- 主应用HTML结构... (此处省略，与之前版本相同) -->
     <h1>个人药品管理系统</h1>
+    
+    <!-- 数据统计面板 -->
     <div class="stats-section">
         <h2>数据统计</h2>
         <div class="stats-grid">
@@ -82,7 +32,9 @@
             </div>
         </div>
     </div>
+    
     <div class="grid-container">
+        <!-- 左侧：表单区域 -->
         <div class="form-section">
             <h2>新增药品</h2>
             <form id="addDrugForm">
@@ -92,9 +44,12 @@
                 <input type="text" id="drugManu" placeholder="生产厂家 (选填)" autocomplete="off">
                 <button type="submit">添加药品</button>
             </form>
+            
             <h2 style="margin-top: 30px;">出入库操作</h2>
             <form id="stockOpForm">
-                <select id="opDrugSelect" required></select>
+                <select id="opDrugSelect" required>
+                    <option value="">--请选择药品--</option>
+                </select>
                 <div>
                     <label><input type="radio" name="opType" value="IN" checked> 入库</label>
                     <label><input type="radio" name="opType" value="OUT"> 出库</label>
@@ -104,22 +59,44 @@
                 <button type="submit">执行操作</button>
             </form>
         </div>
+        
+        <!-- 右侧：库存表格 -->
         <div class="table-section">
             <h2>库存总览</h2>
-            <input type="text" id="searchInput" class="search-bar" placeholder="搜索药品名称..." autocomplete="off">
-            <table>
-                <thead><tr><th>名称</th><th>规格</th><th>厂家</th><th>当前库存</th><th>操作</th></tr></thead>
+            <input type="text" id="searchInput" class="search-bar" placeholder="搜索药品名称或厂家..." autocomplete="off">
+            <table id="drugTable">
+                <thead>
+                    <tr>
+                        <th>名称</th>
+                        <th>规格</th>
+                        <th>厂家</th>
+                        <th>当前库存</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
                 <tbody id="drugTableBody"></tbody>
             </table>
         </div>
     </div>
+    
+    <!-- 出入库流水 -->
     <div class="table-section" style="margin-top: 30px;">
         <h2>出入库流水</h2>
-        <table>
-            <thead><tr><th>时间</th><th>药品名称</th><th>操作类型</th><th>数量</th><th>单价</th></tr></thead>
+        <table id="recordsTable">
+            <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>药品名称</th>
+                    <th>操作类型</th>
+                    <th>数量</th>
+                    <th>单价</th>
+                </tr>
+            </thead>
             <tbody id="recordsTableBody"></tbody>
         </table>
     </div>
+    
+    <!-- 数据管理 -->
     <div class="data-management">
         <button id="exportDataBtn" class="btn-secondary">导出数据</button>
         <input type="file" id="importDataInput" accept=".json" style="display: none;">
@@ -128,190 +105,9 @@
     </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-        const DB_KEY = 'myDrugSystemData_v2';
-        let state = { drugs: [], stockRecords: [] };
-        function loadData() {
-            const data = localStorage.getItem(DB_KEY);
-            if (data) {
-                try {
-                    const parsedData = JSON.parse(data);
-                    if (parsedData.drugs && parsedData.stockRecords) state = parsedData;
-                } catch (e) { console.error("解析数据失败", e); }
-            }
-        }
-        function saveData() { 
-            localStorage.setItem(DB_KEY, JSON.stringify(state)); 
-            updateStatistics();
-        }
-        function addDrug(name, spec, manufacturer, defaultPrice) {
-            if (!name || defaultPrice === '' || isNaN(parseFloat(defaultPrice))) { alert('药品名称和参考单价为必填项！'); return false; }
-            const newDrug = { id: 'drug_' + Date.now(), name, spec, manufacturer, defaultPrice: parseFloat(defaultPrice) };
-            state.drugs.push(newDrug);
-            saveData();
-            return true;
-        }
-        function deleteDrug(drugId) {
-            if (confirm('确定要删除这个药品吗？')) {
-                state.drugs = state.drugs.filter(d => d.id !== drugId);
-                saveData();
-                renderAll();
-            }
-        }
-        window.deleteDrug = deleteDrug;
-        function performStockOperation(drugId, type, quantity, price) {
-            if (!drugId || !type || !quantity || quantity <= 0) { alert('药品、类型和数量为必填项！'); return false; }
-            if (type === 'IN' && (price === '' || isNaN(parseFloat(price)))) { alert('入库必须填写单价！'); return false; }
-            if (type === 'OUT') {
-                const currentStock = calculateStock(drugId);
-                if (currentStock < quantity) { alert(`库存不足！当前: ${currentStock}`); return false; }
-            }
-            const newRecord = { recordId: 'rec_' + Date.now(), drugId, type, quantity: parseInt(quantity), price: parseFloat(price) || 0, timestamp: new Date().toLocaleString('zh-CN') };
-            state.stockRecords.push(newRecord);
-            saveData();
-            return true;
-        }
-        function calculateStock(drugId) { return state.stockRecords.reduce((stock, record) => (record.drugId === drugId) ? stock + (record.type === 'IN' ? record.quantity : -record.quantity) : stock, 0); }
-        function getDrugById(drugId) { return state.drugs.find(d => d.id === drugId); }
-        function renderDrugTable(filter = '') {
-            const tableBody = document.getElementById('drugTableBody');
-            tableBody.innerHTML = '';
-            const lowerCaseFilter = filter.toLowerCase();
-            state.drugs.filter(drug => drug.name.toLowerCase().includes(lowerCaseFilter)).forEach(drug => {
-                const stock = calculateStock(drug.id);
-                const row = document.createElement('tr');
-                row.innerHTML = `<td>${drug.name}</td><td>${drug.spec || '-'}</td><td>${drug.manufacturer || '-'}</td><td class="${stock <= 10 ? 'warning-stock' : ''}">${stock}</td><td><button class="btn-danger" onclick="deleteDrug('${drug.id}')">删除</button></td>`;
-                tableBody.appendChild(row);
-            });
-        }
-        function updateDrugSelector() {
-            const select = document.getElementById('opDrugSelect');
-            select.innerHTML = '<option value="">--请选择药品--</option>';
-            state.drugs.forEach(drug => { select.innerHTML += `<option value="${drug.id}">${drug.name} (${drug.spec || '无规格'})</option>`; });
-        }
-        function renderRecordsTable() {
-            const tableBody = document.getElementById('recordsTableBody');
-            tableBody.innerHTML = '';
-            [...state.stockRecords].reverse().slice(0, 100).forEach(record => {
-                const drug = getDrugById(record.drugId);
-                const row = document.createElement('tr');
-                row.innerHTML = `<td>${record.timestamp}</td><td>${drug ? drug.name : '（已删除）'}</td><td>${record.type === 'IN' ? '入库' : '出库'}</td><td>${record.quantity}</td><td>${record.price > 0 ? record.price.toFixed(2) : '-'}</td>`;
-                tableBody.appendChild(row);
-            });
-        }
-        function renderAll(filter = '') { updateDrugSelector(); renderDrugTable(filter); renderRecordsTable(); updateStatistics(); }
-        
-        function updateStatistics() {
-            // 计算统计数据
-            const totalDrugs = state.drugs.length;
-            let totalStock = 0;
-            let totalValue = 0;
-            let lowStockCount = 0;
-            
-            state.drugs.forEach(drug => {
-                const stock = calculateStock(drug.id);
-                totalStock += stock;
-                
-                // 计算库存价值（使用最近一次入库价格或默认价格）
-                const recentInRecord = [...state.stockRecords]
-                    .filter(r => r.drugId === drug.id && r.type === 'IN' && r.price > 0)
-                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
-                const price = recentInRecord ? recentInRecord.price : drug.defaultPrice;
-                totalValue += stock * price;
-                
-                // 统计低库存药品（库存<=10）
-                if (stock <= 10) lowStockCount++;
-            });
-            
-            // 更新界面
-            document.getElementById('totalDrugs').textContent = totalDrugs;
-            document.getElementById('totalStock').textContent = totalStock;
-            document.getElementById('totalValue').textContent = totalValue.toFixed(2);
-            document.getElementById('lowStockCount').textContent = lowStockCount;
-        }
-        document.getElementById('addDrugForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const name = document.getElementById('drugName').value.trim(), spec = document.getElementById('drugSpec').value.trim(), manu = document.getElementById('drugManu').value.trim(), price = document.getElementById('drugPrice').value;
-            if (addDrug(name, spec, manu, price)) { e.target.reset(); renderAll(); }
-        });
-        document.getElementById('stockOpForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const drugId = document.getElementById('opDrugSelect').value, type = document.querySelector('input[name="opType"]:checked').value, quantity = document.getElementById('opQuantity').value, price = document.getElementById('opPrice').value;
-            if (performStockOperation(drugId, type, quantity, price)) { e.target.reset(); document.querySelector('input[name="opType"][value="IN"]').checked = true; updateOpPriceRequirement(); renderAll(); }
-        });
-        document.getElementById('searchInput').addEventListener('input', (e) => renderDrugTable(e.target.value));
-        const opPriceInput = document.getElementById('opPrice');
-        function updateOpPriceRequirement() {
-            const type = document.querySelector('input[name="opType"]:checked').value;
-            opPriceInput.placeholder = (type === 'IN') ? "本次入库单价 (必填)" : "出库价格 (选填)";
-            opPriceInput.required = (type === 'IN');
-        }
-        document.querySelectorAll('input[name="opType"]').forEach(radio => radio.addEventListener('change', updateOpPriceRequirement));
-        document.getElementById('exportDataBtn').addEventListener('click', () => {
-            if (state.drugs.length === 0 && state.stockRecords.length === 0) { alert("没有数据可以导出。"); return; }
-            
-            // 准备CSV数据
-            // 1. 药品数据CSV
-            let drugsCSV = 'ID,药品名称,规格,生产厂家,参考单价,当前库存\n';
-            state.drugs.forEach(drug => {
-                const stock = calculateStock(drug.id);
-                drugsCSV += `"${drug.id}","${drug.name}","${drug.spec || ''}","${drug.manufacturer || ''}",${drug.defaultPrice},${stock}\n`;
-            });
-            
-            // 2. 流水记录CSV
-            let recordsCSV = '记录ID,药品ID,药品名称,操作类型,数量,单价,时间\n';
-            state.stockRecords.forEach(record => {
-                const drug = getDrugById(record.drugId);
-                const drugName = drug ? drug.name : '（已删除）';
-                const type = record.type === 'IN' ? '入库' : '出库';
-                recordsCSV += `"${record.recordId}","${record.drugId}","${drugName}","${type}",${record.quantity},${record.price},"${record.timestamp}"\n`;
-            });
-            
-            // 创建ZIP文件（这里简化处理，分别下载两个CSV文件）
-            const date = new Date().toISOString().split('T')[0];
-            
-            // 下载药品数据
-            const drugsBlob = new Blob(['\ufeff' + drugsCSV], { type: 'text/csv;charset=utf-8;' });
-            const drugsUrl = URL.createObjectURL(drugsBlob);
-            const drugsLink = document.createElement('a');
-            drugsLink.href = drugsUrl;
-            drugsLink.download = `药品清单_${date}.csv`;
-            document.body.appendChild(drugsLink);
-            drugsLink.click();
-            document.body.removeChild(drugsLink);
-            URL.revokeObjectURL(drugsUrl);
-            
-            // 延迟下载流水记录
-            setTimeout(() => {
-                const recordsBlob = new Blob(['\ufeff' + recordsCSV], { type: 'text/csv;charset=utf-8;' });
-                const recordsUrl = URL.createObjectURL(recordsBlob);
-                const recordsLink = document.createElement('a');
-                recordsLink.href = recordsUrl;
-                recordsLink.download = `出入库流水_${date}.csv`;
-                document.body.appendChild(recordsLink);
-                recordsLink.click();
-                document.body.removeChild(recordsLink);
-                URL.revokeObjectURL(recordsUrl);
-            }, 500);
-        });
-        document.getElementById('importDataBtn').addEventListener('click', () => document.getElementById('importDataInput').click());
-        document.getElementById('importDataInput').addEventListener('change', (event) => {
-            const file = event.target.files[0]; if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const importedState = JSON.parse(e.target.result);
-                    if (typeof importedState.drugs === 'object' && typeof importedState.stockRecords === 'object') {
-                        if (confirm('这将覆盖所有现有数据，确定要导入吗？')) { state = importedState; saveData(); renderAll(); alert('数据导入成功！'); }
-                    } else { alert('文件格式不正确！'); }
-                } catch (error) { alert('导入失败，文件内容不是有效的JSON格式！'); }
-            };
-            reader.readAsText(file); event.target.value = '';
-        });
-        loadData(); updateOpPriceRequirement(); renderAll();
-});
-</script>
-
+<!-- 引入JavaScript模块 -->
+<script src="assets/js/data-logic.js"></script>
+<script src="assets/js/ui-utils.js"></script>
+<script src="assets/js/main.js"></script>
 </body>
 </html>
