@@ -25,12 +25,63 @@
         .data-management { margin-top: 20px; display: flex; gap: 10px; }
         .warning-stock { color: red; font-weight: bold; }
         label > input[type="radio"] { margin-right: 5px; }
+        .stats-section { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 5px; 
+            margin-top: 20px; 
+            border: 1px solid #dee2e6;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .stat-item {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
 <div id="app-container">
     <!-- 主应用HTML结构... (此处省略，与之前版本相同) -->
     <h1>个人药品管理系统</h1>
+    <div class="stats-section">
+        <h2>数据统计</h2>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value" id="totalDrugs">0</div>
+                <div class="stat-label">药品种类</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="totalStock">0</div>
+                <div class="stat-label">总库存量</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="totalValue">0</div>
+                <div class="stat-label">库存总值(元)</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="lowStockCount">0</div>
+                <div class="stat-label">低库存药品</div>
+            </div>
+        </div>
+    </div>
     <div class="grid-container">
         <div class="form-section">
             <h2>新增药品</h2>
@@ -73,6 +124,7 @@
         <button id="exportDataBtn" class="btn-secondary">导出数据</button>
         <input type="file" id="importDataInput" accept=".json" style="display: none;">
         <button id="importDataBtn" class="btn-secondary">导入数据</button>
+        <a href="analytics.html" target="_blank" class="btn-secondary" style="text-decoration: none; display: inline-block; padding: 10px 15px; background-color: #28a745; color: white; border-radius: 4px; margin-left: 10px;">数据分析</a>
     </div>
 </div>
 
@@ -89,7 +141,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch (e) { console.error("解析数据失败", e); }
             }
         }
-        function saveData() { localStorage.setItem(DB_KEY, JSON.stringify(state)); }
+        function saveData() { 
+            localStorage.setItem(DB_KEY, JSON.stringify(state)); 
+            updateStatistics();
+        }
         function addDrug(name, spec, manufacturer, defaultPrice) {
             if (!name || defaultPrice === '' || isNaN(parseFloat(defaultPrice))) { alert('药品名称和参考单价为必填项！'); return false; }
             const newDrug = { id: 'drug_' + Date.now(), name, spec, manufacturer, defaultPrice: parseFloat(defaultPrice) };
@@ -145,7 +200,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 tableBody.appendChild(row);
             });
         }
-        function renderAll(filter = '') { updateDrugSelector(); renderDrugTable(filter); renderRecordsTable(); }
+        function renderAll(filter = '') { updateDrugSelector(); renderDrugTable(filter); renderRecordsTable(); updateStatistics(); }
+        
+        function updateStatistics() {
+            // 计算统计数据
+            const totalDrugs = state.drugs.length;
+            let totalStock = 0;
+            let totalValue = 0;
+            let lowStockCount = 0;
+            
+            state.drugs.forEach(drug => {
+                const stock = calculateStock(drug.id);
+                totalStock += stock;
+                
+                // 计算库存价值（使用最近一次入库价格或默认价格）
+                const recentInRecord = [...state.stockRecords]
+                    .filter(r => r.drugId === drug.id && r.type === 'IN' && r.price > 0)
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+                const price = recentInRecord ? recentInRecord.price : drug.defaultPrice;
+                totalValue += stock * price;
+                
+                // 统计低库存药品（库存<=10）
+                if (stock <= 10) lowStockCount++;
+            });
+            
+            // 更新界面
+            document.getElementById('totalDrugs').textContent = totalDrugs;
+            document.getElementById('totalStock').textContent = totalStock;
+            document.getElementById('totalValue').textContent = totalValue.toFixed(2);
+            document.getElementById('lowStockCount').textContent = lowStockCount;
+        }
         document.getElementById('addDrugForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const name = document.getElementById('drugName').value.trim(), spec = document.getElementById('drugSpec').value.trim(), manu = document.getElementById('drugManu').value.trim(), price = document.getElementById('drugPrice').value;
@@ -166,10 +250,50 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('input[name="opType"]').forEach(radio => radio.addEventListener('change', updateOpPriceRequirement));
         document.getElementById('exportDataBtn').addEventListener('click', () => {
             if (state.drugs.length === 0 && state.stockRecords.length === 0) { alert("没有数据可以导出。"); return; }
-            const dataStr = JSON.stringify(state, null, 2), blob = new Blob([dataStr], { type: "application/json" }), url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = `drug_system_backup_${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+            
+            // 准备CSV数据
+            // 1. 药品数据CSV
+            let drugsCSV = 'ID,药品名称,规格,生产厂家,参考单价,当前库存\n';
+            state.drugs.forEach(drug => {
+                const stock = calculateStock(drug.id);
+                drugsCSV += `"${drug.id}","${drug.name}","${drug.spec || ''}","${drug.manufacturer || ''}",${drug.defaultPrice},${stock}\n`;
+            });
+            
+            // 2. 流水记录CSV
+            let recordsCSV = '记录ID,药品ID,药品名称,操作类型,数量,单价,时间\n';
+            state.stockRecords.forEach(record => {
+                const drug = getDrugById(record.drugId);
+                const drugName = drug ? drug.name : '（已删除）';
+                const type = record.type === 'IN' ? '入库' : '出库';
+                recordsCSV += `"${record.recordId}","${record.drugId}","${drugName}","${type}",${record.quantity},${record.price},"${record.timestamp}"\n`;
+            });
+            
+            // 创建ZIP文件（这里简化处理，分别下载两个CSV文件）
+            const date = new Date().toISOString().split('T')[0];
+            
+            // 下载药品数据
+            const drugsBlob = new Blob(['\ufeff' + drugsCSV], { type: 'text/csv;charset=utf-8;' });
+            const drugsUrl = URL.createObjectURL(drugsBlob);
+            const drugsLink = document.createElement('a');
+            drugsLink.href = drugsUrl;
+            drugsLink.download = `药品清单_${date}.csv`;
+            document.body.appendChild(drugsLink);
+            drugsLink.click();
+            document.body.removeChild(drugsLink);
+            URL.revokeObjectURL(drugsUrl);
+            
+            // 延迟下载流水记录
+            setTimeout(() => {
+                const recordsBlob = new Blob(['\ufeff' + recordsCSV], { type: 'text/csv;charset=utf-8;' });
+                const recordsUrl = URL.createObjectURL(recordsBlob);
+                const recordsLink = document.createElement('a');
+                recordsLink.href = recordsUrl;
+                recordsLink.download = `出入库流水_${date}.csv`;
+                document.body.appendChild(recordsLink);
+                recordsLink.click();
+                document.body.removeChild(recordsLink);
+                URL.revokeObjectURL(recordsUrl);
+            }, 500);
         });
         document.getElementById('importDataBtn').addEventListener('click', () => document.getElementById('importDataInput').click());
         document.getElementById('importDataInput').addEventListener('change', (event) => {

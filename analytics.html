@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>药品数据分析中心</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        .header {
+            background-color: #0056b3;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .btn {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        .container {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            color: #666;
+            font-size: 14px;
+            font-weight: normal;
+        }
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .stat-card .unit {
+            font-size: 14px;
+            color: #999;
+        }
+        .chart-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .chart-section h2 {
+            margin-top: 0;
+            color: #0056b3;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        .table-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .table-section h2 {
+            margin-top: 0;
+            color: #0056b3;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #495057;
+        }
+        .warning {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .success {
+            color: #28a745;
+        }
+        .update-info {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin: 20px 0;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+        #scriptUploadInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>药品数据分析中心</h1>
+        <div class="nav-buttons">
+            <button class="btn btn-secondary" onclick="refreshData()">刷新数据</button>
+            <input type="file" id="scriptUploadInput" accept=".py">
+            <button class="btn btn-secondary" onclick="document.getElementById('scriptUploadInput').click()">更新分析脚本</button>
+            <a href="index.html" class="btn">返回主系统</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="update-info" id="updateTime">
+            数据更新时间：加载中...
+        </div>
+
+        <!-- 统计概览 -->
+        <div class="stats-summary">
+            <div class="stat-card">
+                <h3>药品种类</h3>
+                <div class="value" id="totalDrugs">-</div>
+                <div class="unit">种</div>
+            </div>
+            <div class="stat-card">
+                <h3>总库存量</h3>
+                <div class="value" id="totalStock">-</div>
+                <div class="unit">件</div>
+            </div>
+            <div class="stat-card">
+                <h3>库存总值</h3>
+                <div class="value" id="totalValue">-</div>
+                <div class="unit">元</div>
+            </div>
+            <div class="stat-card">
+                <h3>低库存预警</h3>
+                <div class="value warning" id="lowStockCount">-</div>
+                <div class="unit">种</div>
+            </div>
+            <div class="stat-card">
+                <h3>本月入库</h3>
+                <div class="value success" id="monthlyIn">-</div>
+                <div class="unit">件</div>
+            </div>
+            <div class="stat-card">
+                <h3>本月出库</h3>
+                <div class="value" id="monthlyOut">-</div>
+                <div class="unit">件</div>
+            </div>
+        </div>
+
+        <!-- 图表区域 -->
+        <div class="chart-section">
+            <h2>数据可视化</h2>
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <canvas id="stockChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="valueChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="monthlyChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 低库存预警表格 -->
+        <div class="table-section">
+            <h2>低库存药品明细</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>药品名称</th>
+                        <th>规格</th>
+                        <th>当前库存</th>
+                        <th>参考单价</th>
+                        <th>建议补货量</th>
+                    </tr>
+                </thead>
+                <tbody id="lowStockTable">
+                    <tr><td colspan="5" style="text-align: center;">暂无低库存药品</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 高频使用药品 -->
+        <div class="table-section">
+            <h2>高频使用药品 TOP 10</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>药品名称</th>
+                        <th>本月出库量</th>
+                        <th>本月出库次数</th>
+                        <th>当前库存</th>
+                        <th>库存状态</th>
+                    </tr>
+                </thead>
+                <tbody id="topDrugsTable">
+                    <tr><td colspan="5" style="text-align: center;">暂无数据</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let charts = {};
+        
+        // 初始化图表
+        function initCharts() {
+            // 库存分布图
+            const stockCtx = document.getElementById('stockChart').getContext('2d');
+            charts.stock = new Chart(stockCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '当前库存',
+                        data: [],
+                        backgroundColor: 'rgba(0, 86, 179, 0.6)',
+                        borderColor: 'rgba(0, 86, 179, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '药品库存分布'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // 出入库趋势图
+            const trendCtx = document.getElementById('trendChart').getContext('2d');
+            charts.trend = new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '入库',
+                        data: [],
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1
+                    }, {
+                        label: '出库',
+                        data: [],
+                        borderColor: 'rgb(255, 99, 132)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '最近7天出入库趋势'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // 库存价值分布
+            const valueCtx = document.getElementById('valueChart').getContext('2d');
+            charts.value = new Chart(valueCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.6)',
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(255, 206, 86, 0.6)',
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(153, 102, 255, 0.6)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '库存价值分布 TOP 5'
+                        }
+                    }
+                }
+            });
+
+            // 月度对比
+            const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+            charts.monthly = new Chart(monthlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '入库量',
+                        data: [],
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)'
+                    }, {
+                        label: '出库量',
+                        data: [],
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '最近6个月出入库对比'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // 加载数据并更新界面
+        function loadData() {
+            const DB_KEY = 'myDrugSystemData_v2';
+            const data = localStorage.getItem(DB_KEY);
+            
+            if (!data) {
+                document.getElementById('updateTime').textContent = '未找到数据，请先在主系统中添加数据';
+                return;
+            }
+            
+            const systemData = JSON.parse(data);
+            const drugs = systemData.drugs || [];
+            const records = systemData.stockRecords || [];
+            
+            // 计算统计数据
+            updateStatistics(drugs, records);
+            updateCharts(drugs, records);
+            updateTables(drugs, records);
+            
+            // 更新时间
+            document.getElementById('updateTime').textContent = `数据更新时间：${new Date().toLocaleString('zh-CN')}`;
+        }
+
+        // 更新统计数据
+        function updateStatistics(drugs, records) {
+            // 基础统计
+            document.getElementById('totalDrugs').textContent = drugs.length;
+            
+            let totalStock = 0;
+            let totalValue = 0;
+            let lowStockCount = 0;
+            
+            drugs.forEach(drug => {
+                const stock = calculateStock(drug.id, records);
+                totalStock += stock;
+                
+                // 获取最新入库价格
+                const recentPrice = getRecentPrice(drug.id, records) || drug.defaultPrice;
+                totalValue += stock * recentPrice;
+                
+                if (stock <= 10) lowStockCount++;
+            });
+            
+            document.getElementById('totalStock').textContent = totalStock;
+            document.getElementById('totalValue').textContent = totalValue.toFixed(2);
+            document.getElementById('lowStockCount').textContent = lowStockCount;
+            
+            // 本月统计
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            
+            let monthlyIn = 0;
+            let monthlyOut = 0;
+            
+            records.forEach(record => {
+                const recordDate = new Date(record.timestamp);
+                if (recordDate >= monthStart) {
+                    if (record.type === 'IN') {
+                        monthlyIn += record.quantity;
+                    } else {
+                        monthlyOut += record.quantity;
+                    }
+                }
+            });
+            
+            document.getElementById('monthlyIn').textContent = monthlyIn;
+            document.getElementById('monthlyOut').textContent = monthlyOut;
+        }
+
+        // 更新图表
+        function updateCharts(drugs, records) {
+            // 1. 库存分布图
+            const stockData = drugs.map(drug => ({
+                name: drug.name,
+                stock: calculateStock(drug.id, records)
+            })).sort((a, b) => b.stock - a.stock).slice(0, 10);
+            
+            charts.stock.data.labels = stockData.map(d => d.name);
+            charts.stock.data.datasets[0].data = stockData.map(d => d.stock);
+            charts.stock.update();
+            
+            // 2. 出入库趋势（最近7天）
+            const trendData = calculateTrend(records, 7);
+            charts.trend.data.labels = trendData.labels;
+            charts.trend.data.datasets[0].data = trendData.inData;
+            charts.trend.data.datasets[1].data = trendData.outData;
+            charts.trend.update();
+            
+            // 3. 库存价值分布
+            const valueData = drugs.map(drug => {
+                const stock = calculateStock(drug.id, records);
+                const price = getRecentPrice(drug.id, records) || drug.defaultPrice;
+                return {
+                    name: drug.name,
+                    value: stock * price
+                };
+            }).sort((a, b) => b.value - a.value).slice(0, 5);
+            
+            charts.value.data.labels = valueData.map(d => d.name);
+            charts.value.data.datasets[0].data = valueData.map(d => d.value);
+            charts.value.update();
+            
+            // 4. 月度对比
+            const monthlyData = calculateMonthlyData(records, 6);
+            charts.monthly.data.labels = monthlyData.labels;
+            charts.monthly.data.datasets[0].data = monthlyData.inData;
+            charts.monthly.data.datasets[1].data = monthlyData.outData;
+            charts.monthly.update();
+        }
+
+        // 更新表格
+        function updateTables(drugs, records) {
+            // 低库存表格
+            const lowStockDrugs = drugs.map(drug => {
+                const stock = calculateStock(drug.id, records);
+                return { ...drug, stock };
+            }).filter(d => d.stock <= 10).sort((a, b) => a.stock - b.stock);
+            
+            const lowStockTable = document.getElementById('lowStockTable');
+            if (lowStockDrugs.length > 0) {
+                lowStockTable.innerHTML = lowStockDrugs.map(drug => `
+                    <tr>
+                        <td>${drug.name}</td>
+                        <td>${drug.spec || '-'}</td>
+                        <td class="warning">${drug.stock}</td>
+                        <td>${drug.defaultPrice.toFixed(2)}</td>
+                        <td>${Math.max(20 - drug.stock, 10)}</td>
+                    </tr>
+                `).join('');
+            } else {
+                lowStockTable.innerHTML = '<tr><td colspan="5" style="text-align: center;">暂无低库存药品</td></tr>';
+            }
+            
+            // 高频使用药品
+            const topDrugs = calculateTopDrugs(drugs, records);
+            const topDrugsTable = document.getElementById('topDrugsTable');
+            if (topDrugs.length > 0) {
+                topDrugsTable.innerHTML = topDrugs.map(drug => {
+                    const stockStatus = drug.stock <= 10 ? '<span class="warning">库存不足</span>' : 
+                                       drug.stock <= 20 ? '<span style="color: orange;">库存偏低</span>' : 
+                                       '<span class="success">库存充足</span>';
+                    return `
+                        <tr>
+                            <td>${drug.name}</td>
+                            <td>${drug.monthlyOut}</td>
+                            <td>${drug.outCount}</td>
+                            <td>${drug.stock}</td>
+                            <td>${stockStatus}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // 计算库存
+        function calculateStock(drugId, records) {
+            return records.reduce((stock, record) => {
+                if (record.drugId === drugId) {
+                    return stock + (record.type === 'IN' ? record.quantity : -record.quantity);
+                }
+                return stock;
+            }, 0);
+        }
+
+        // 获取最新入库价格
+        function getRecentPrice(drugId, records) {
+            const inRecords = records.filter(r => r.drugId === drugId && r.type === 'IN' && r.price > 0);
+            if (inRecords.length === 0) return null;
+            
+            return inRecords.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0].price;
+        }
+
+        // 计算趋势数据
+        function calculateTrend(records, days) {
+            const labels = [];
+            const inData = [];
+            const outData = [];
+            
+            for (let i = days - 1; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateStr = date.toLocaleDateString('zh-CN');
+                labels.push(dateStr);
+                
+                const dayRecords = records.filter(r => {
+                    const recordDate = new Date(r.timestamp);
+                    return recordDate.toDateString() === date.toDateString();
+                });
+                
+                const dayIn = dayRecords.filter(r => r.type === 'IN').reduce((sum, r) => sum + r.quantity, 0);
+                const dayOut = dayRecords.filter(r => r.type === 'OUT').reduce((sum, r) => sum + r.quantity, 0);
+                
+                inData.push(dayIn);
+                outData.push(dayOut);
+            }
+            
+            return { labels, inData, outData };
+        }
+
+        // 计算月度数据
+        function calculateMonthlyData(records, months) {
+            const labels = [];
+            const inData = [];
+            const outData = [];
+            
+            for (let i = months - 1; i >= 0; i--) {
+                const date = new Date();
+                date.setMonth(date.getMonth() - i);
+                const year = date.getFullYear();
+                const month = date.getMonth();
+                const monthStr = `${year}年${month + 1}月`;
+                labels.push(monthStr);
+                
+                const monthRecords = records.filter(r => {
+                    const recordDate = new Date(r.timestamp);
+                    return recordDate.getFullYear() === year && recordDate.getMonth() === month;
+                });
+                
+                const monthIn = monthRecords.filter(r => r.type === 'IN').reduce((sum, r) => sum + r.quantity, 0);
+                const monthOut = monthRecords.filter(r => r.type === 'OUT').reduce((sum, r) => sum + r.quantity, 0);
+                
+                inData.push(monthIn);
+                outData.push(monthOut);
+            }
+            
+            return { labels, inData, outData };
+        }
+
+        // 计算高频使用药品
+        function calculateTopDrugs(drugs, records) {
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            
+            return drugs.map(drug => {
+                const monthRecords = records.filter(r => {
+                    const recordDate = new Date(r.timestamp);
+                    return r.drugId === drug.id && r.type === 'OUT' && recordDate >= monthStart;
+                });
+                
+                return {
+                    name: drug.name,
+                    monthlyOut: monthRecords.reduce((sum, r) => sum + r.quantity, 0),
+                    outCount: monthRecords.length,
+                    stock: calculateStock(drug.id, records)
+                };
+            }).filter(d => d.monthlyOut > 0)
+              .sort((a, b) => b.monthlyOut - a.monthlyOut)
+              .slice(0, 10);
+        }
+
+        // 刷新数据
+        function refreshData() {
+            loadData();
+        }
+
+        // 初始化
+        window.onload = function() {
+            initCharts();
+            loadData();
+            
+            // 自动刷新（每30秒）
+            setInterval(refreshData, 30000);
+        };
+
+        // 处理脚本上传
+        document.getElementById('scriptUploadInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.name.endsWith('.py')) {
+                alert('分析脚本更新功能将在后续版本中实现');
+            }
+            e.target.value = '';
+        });
+    </script>
+</body>
+</html>
