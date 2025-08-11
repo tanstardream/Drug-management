@@ -46,6 +46,9 @@ function bindEvents() {
     });
     
     document.getElementById('importDataInput').addEventListener('change', handleImportData);
+    
+    // 数据恢复
+    document.getElementById('dataRecoveryBtn').addEventListener('click', openRecoveryModal);
 }
 
 // 处理添加药品
@@ -315,3 +318,230 @@ function updateStatistics() {
 
 // 将删除函数暴露到全局作用域
 window.deleteDrug = deleteDrug;
+
+// ===== 数据恢复功能 =====
+
+let currentPreviewKey = '';
+
+// 打开数据恢复模态框
+function openRecoveryModal() {
+    document.getElementById('recoveryModal').style.display = 'block';
+    scanStorageData();
+}
+
+// 关闭数据恢复模态框
+function closeRecoveryModal() {
+    document.getElementById('recoveryModal').style.display = 'none';
+    document.getElementById('recoveryDataTable').style.display = 'none';
+    document.getElementById('scanStatus').innerHTML = '';
+}
+
+// 关闭数据预览模态框
+function closePreviewModal() {
+    document.getElementById('dataPreviewModal').style.display = 'none';
+}
+
+// 扫描localStorage中的数据
+function scanStorageData() {
+    const statusDiv = document.getElementById('scanStatus');
+    const tableDiv = document.getElementById('recoveryDataTable');
+    const tbody = document.getElementById('recoveryDataTableBody');
+    
+    statusDiv.innerHTML = '正在扫描...';
+    
+    let foundData = [];
+    
+    // 扫描所有localStorage键
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const data = localStorage.getItem(key);
+        
+        try {
+            const parsed = JSON.parse(data);
+            let drugCount = 0;
+            let recordCount = 0;
+            let dataType = '未知';
+            
+            // 检查是否是药品管理数据
+            if (parsed.drugs && Array.isArray(parsed.drugs)) {
+                drugCount = parsed.drugs.length;
+                dataType = '药品管理数据';
+            }
+            if (parsed.stockRecords && Array.isArray(parsed.stockRecords)) {
+                recordCount = parsed.stockRecords.length;
+            }
+            
+            // 如果包含药品或记录数据，或键名包含drug相关字符
+            if (drugCount > 0 || recordCount > 0 || 
+                key.toLowerCase().includes('drug') || 
+                key.toLowerCase().includes('medicine')) {
+                foundData.push({
+                    key: key,
+                    type: dataType,
+                    drugs: drugCount,
+                    records: recordCount,
+                    size: data.length,
+                    data: data,
+                    version: parsed.version || '未知'
+                });
+            }
+        } catch (e) {
+            // 如果键名包含drug相关字符，也添加到列表（可能是其他格式的数据）
+            if (key.toLowerCase().includes('drug') || key.toLowerCase().includes('medicine')) {
+                foundData.push({
+                    key: key,
+                    type: '文本数据',
+                    drugs: 0,
+                    records: 0,
+                    size: data.length,
+                    data: data,
+                    version: '不适用'
+                });
+            }
+        }
+    }
+    
+    if (foundData.length > 0) {
+        statusDiv.innerHTML = `✅ 找到 ${foundData.length} 个相关数据`;
+        statusDiv.style.color = 'green';
+        
+        tbody.innerHTML = '';
+        foundData.forEach(item => {
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td>${item.key}</td>
+                <td>${item.type}</td>
+                <td>${item.drugs}</td>
+                <td>${item.records}</td>
+                <td>${(item.size / 1024).toFixed(2)} KB</td>
+                <td>
+                    <button onclick="previewStorageData('${item.key}')" class="btn-secondary">预览</button>
+                    ${item.type === '药品管理数据' ? `<button onclick="restoreStorageData('${item.key}')" style="margin-left: 5px;">恢复</button>` : ''}
+                </td>
+            `;
+        });
+        
+        tableDiv.style.display = 'block';
+    } else {
+        statusDiv.innerHTML = '❌ 未找到任何药品管理相关数据';
+        statusDiv.style.color = 'red';
+        tableDiv.style.display = 'none';
+    }
+}
+
+// 预览存储数据
+function previewStorageData(key) {
+    const data = localStorage.getItem(key);
+    const modal = document.getElementById('dataPreviewModal');
+    const title = document.getElementById('previewTitle');
+    const previewDiv = document.getElementById('previewData');
+    const restoreBtn = document.getElementById('previewRestoreBtn');
+    
+    currentPreviewKey = key;
+    title.textContent = `数据预览: ${key}`;
+    
+    try {
+        const parsed = JSON.parse(data);
+        
+        let previewText = '';
+        previewText += `存储键: ${key}\n`;
+        previewText += `数据大小: ${(data.length / 1024).toFixed(2)} KB\n`;
+        previewText += `数据版本: ${parsed.version || '未知'}\n\n`;
+        
+        if (parsed.drugs && Array.isArray(parsed.drugs)) {
+            previewText += `=== 药品数据 (${parsed.drugs.length}种) ===\n`;
+            parsed.drugs.slice(0, 5).forEach(drug => {
+                previewText += `• ${drug.name || '未知药品'} (${drug.spec || '无规格'}) - 库存: ${drug.currentStock || 0}\n`;
+            });
+            if (parsed.drugs.length > 5) {
+                previewText += `... 还有 ${parsed.drugs.length - 5} 种药品\n`;
+            }
+            previewText += '\n';
+        }
+        
+        if (parsed.stockRecords && Array.isArray(parsed.stockRecords)) {
+            previewText += `=== 库存记录 (${parsed.stockRecords.length}条) ===\n`;
+            parsed.stockRecords.slice(0, 5).forEach(record => {
+                const type = record.type === 'IN' ? '入库' : '出库';
+                previewText += `• ${record.timestamp || '未知时间'} - ${type} ${record.quantity || 0}个\n`;
+            });
+            if (parsed.stockRecords.length > 5) {
+                previewText += `... 还有 ${parsed.stockRecords.length - 5} 条记录\n`;
+            }
+        }
+        
+        // 如果数据看起来是完整的药品管理数据，显示恢复按钮
+        if (parsed.drugs && parsed.stockRecords) {
+            restoreBtn.style.display = 'inline-block';
+        } else {
+            restoreBtn.style.display = 'none';
+        }
+        
+        previewDiv.textContent = previewText;
+    } catch (e) {
+        // 显示原始数据预览
+        const preview = data.length > 1000 ? data.substring(0, 1000) + '...\n\n(数据过长，仅显示前1000字符)' : data;
+        previewDiv.textContent = `存储键: ${key}\n数据大小: ${(data.length / 1024).toFixed(2)} KB\n数据类型: 文本数据\n\n原始内容:\n${preview}`;
+        restoreBtn.style.display = 'none';
+    }
+    
+    modal.style.display = 'block';
+}
+
+// 恢复存储数据
+function restoreStorageData(key = null) {
+    const keyToRestore = key || currentPreviewKey;
+    
+    if (!keyToRestore) {
+        UIUtils.Toast.show('没有指定要恢复的数据', 'error');
+        return;
+    }
+    
+    if (confirm(`确定要恢复数据 "${keyToRestore}" 吗？这将覆盖当前的药品管理数据！`)) {
+        const data = localStorage.getItem(keyToRestore);
+        if (data) {
+            const DB_KEY = 'myDrugSystemData_v3';
+            localStorage.setItem(DB_KEY, data);
+            UIUtils.Toast.show('数据恢复成功！', 'success');
+            closePreviewModal();
+            closeRecoveryModal();
+            
+            // 重新加载数据并刷新界面
+            setTimeout(() => {
+                DataLogic.loadData();
+                renderAll();
+            }, 500);
+        } else {
+            UIUtils.Toast.show('恢复失败：数据不存在', 'error');
+        }
+    }
+}
+
+// 绑定恢复按钮事件
+document.addEventListener('DOMContentLoaded', function() {
+    // 为预览模态框的恢复按钮绑定事件
+    document.getElementById('previewRestoreBtn').addEventListener('click', function() {
+        restoreStorageData();
+    });
+    
+    // 点击模态框背景关闭
+    document.getElementById('recoveryModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeRecoveryModal();
+        }
+    });
+    
+    document.getElementById('dataPreviewModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closePreviewModal();
+        }
+    });
+});
+
+// 将数据恢复函数暴露到全局作用域
+window.openRecoveryModal = openRecoveryModal;
+window.closeRecoveryModal = closeRecoveryModal;
+window.closePreviewModal = closePreviewModal;
+window.scanStorageData = scanStorageData;
+window.previewStorageData = previewStorageData;
+window.restoreStorageData = restoreStorageData;

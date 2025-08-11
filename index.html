@@ -101,7 +101,56 @@
         <button id="exportDataBtn" class="btn-secondary">导出数据</button>
         <input type="file" id="importDataInput" accept=".json" style="display: none;">
         <button id="importDataBtn" class="btn-secondary">导入数据</button>
+        <button id="dataRecoveryBtn" class="btn-secondary">数据恢复</button>
         <a href="analytics.html" target="_blank" class="btn-secondary" style="text-decoration: none; display: inline-block; padding: 10px 15px; background-color: #28a745; color: white; border-radius: 4px; margin-left: 10px;">数据分析</a>
+    </div>
+</div>
+
+<!-- 数据恢复模态框 -->
+<div id="recoveryModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>数据恢复</h3>
+            <span class="modal-close" onclick="closeRecoveryModal()">&times;</span>
+        </div>
+        <div>
+            <p>扫描并预览浏览器中的药品管理数据</p>
+            <button onclick="scanStorageData()">扫描数据</button>
+            <div id="scanStatus" style="margin: 15px 0;"></div>
+            
+            <!-- 数据列表 -->
+            <div id="recoveryDataTable" style="display: none; margin-top: 20px;">
+                <h4>发现的数据</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>存储键</th>
+                            <th>类型</th>
+                            <th>药品数量</th>
+                            <th>记录数量</th>
+                            <th>大小</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recoveryDataTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 数据预览模态框 -->
+<div id="dataPreviewModal" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">
+            <h3 id="previewTitle">数据预览</h3>
+            <span class="modal-close" onclick="closePreviewModal()">&times;</span>
+        </div>
+        <div id="previewData" style="white-space: pre-wrap; font-family: 'Courier New', monospace; background: #f8f9fa; padding: 15px; border-radius: 4px; border: 1px solid #e9ecef; max-height: 400px; overflow-y: auto; margin-bottom: 15px;"></div>
+        <div class="modal-buttons">
+            <button id="previewRestoreBtn" class="btn">恢复此数据</button>
+            <button onclick="closePreviewModal()" class="btn-secondary">取消</button>
+        </div>
     </div>
 </div>
 
